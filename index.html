@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Мой бюджет</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --bg3: #1a1a24;
+  --border: rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.14);
+  --text: #f0f0f8;
+  --text2: rgba(240,240,248,0.55);
+  --text3: rgba(240,240,248,0.3);
+  --accent: #7c5cfc;
+  --accent2: #9d7dff;
+  --green: #2dd4a0;
+  --red: #ff5f6d;
+  --amber: #fbbf24;
+  --teal: #38bdf8;
+  --r: 16px;
+  --r2: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; font-size: 15px; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+/* ── LOCK SCREEN ── */
+#lockScreen {
+  position: fixed; inset: 0; z-index: 1000;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 24px;
+  animation: fadeIn 0.4s ease;
+}
+.lock-logo {
+  font-family: 'Unbounded', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.2em;
+  color: var(--text2); text-transform: uppercase; margin-bottom: 48px;
+}
+.lock-dots {
+  display: flex; gap: 14px; margin-bottom: 40px; height: 18px; align-items: center;
+}
+.lock-dot {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--border2);
+  background: transparent;
+  transition: all 0.2s ease;
+}
+.lock-dot.filled { background: var(--accent); border-color: var(--accent); transform: scale(1.15); }
+.lock-dot.error  { background: var(--red);    border-color: var(--red); animation: shake 0.4s ease; }
+.pin-hint { font-size: 13px; color: var(--text3); margin-bottom: 32px; min-height: 20px; text-align: center; }
+
+.numpad {
+  display: grid; grid-template-columns: repeat(3, 72px);
+  gap: 14px;
+}
+.num-btn {
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--bg3); border: 0.5px solid var(--border);
+  color: var(--text); font-family: 'Inter', sans-serif;
+  font-size: 22px; font-weight: 400; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s ease; user-select: none;
+}
+.num-btn:active { background: var(--accent); transform: scale(0.93); }
+.num-btn.del { font-size: 18px; background: transparent; border-color: transparent; color: var(--text2); }
+.num-btn.del:active { color: var(--red); background: transparent; transform: scale(0.93); }
+.num-btn.empty { visibility: hidden; }
+
+/* ── APP SHELL ── */
+#app { display: none; flex-direction: column; height: 100%; }
+
+/* ── HEADER ── */
+.header {
+  padding: 16px 20px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.header-title { font-family: 'Unbounded', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+.header-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.icon-btn {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--bg3); border: 0.5px solid var(--border);
+  color: var(--text2); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.icon-btn:active { background: var(--bg2); color: var(--text); }
+
+/* ── SCROLL CONTENT ── */
+.scroll-body {
+  flex: 1; overflow-y: auto; padding: 0 16px 100px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── CARDS ── */
+.card {
+  background: var(--bg3); border: 0.5px solid var(--border);
+  border-radius: var(--r); padding: 16px 18px; margin-bottom: 12px;
+}
+.card-sm { border-radius: var(--r2); padding: 12px 14px; }
+
+/* ── BALANCE CARD ── */
+.balance-card {
+  background: linear-gradient(135deg, #1a1030 0%, #0f1a30 100%);
+  border: 0.5px solid rgba(124,92,252,0.3);
+  border-radius: var(--r); padding: 20px; margin-bottom: 12px;
+  position: relative; overflow: hidden;
+}
+.balance-card::before {
+  content: ''; position: absolute; top: -40px; right: -40px;
+  width: 160px; height: 160px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(124,92,252,0.15) 0%, transparent 70%);
+}
+.balance-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 6px; }
+.balance-amount { font-family: 'Unbounded', sans-serif; font-size: 28px; font-weight: 700; }
+.balance-amount.pos { color: var(--green); }
+.balance-amount.neg { color: var(--red); }
+.balance-row { display: flex; gap: 16px; margin-top: 14px; }
+.balance-mini { flex: 1; }
+.balance-mini-label { font-size: 10px; color: var(--text3); margin-bottom: 3px; }
+.balance-mini-val { font-size: 14px; font-weight: 500; }
+
+/* ── PROGRESS ── */
+.prog-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; }
+.prog-fill { height: 100%; border-radius: 2px; transition: width 0.6s ease; }
+.prog-fill.green { background: var(--green); }
+.prog-fill.amber { background: var(--amber); }
+.prog-fill.red   { background: var(--red); }
+
+/* ── SECTION TITLE ── */
+.section-title {
+  font-size: 11px; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.12em; padding: 8px 0 10px; font-weight: 500;
+}
+
+/* ── CATEGORY LIST ITEM ── */
+.cat-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.cat-item:last-child { border-bottom: none; }
+.cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cat-name { flex: 1; font-size: 14px; line-height: 1.3; }
+.cat-vals { text-align: right; }
+.cat-fact { font-size: 14px; font-weight: 500; }
+.cat-plan { font-size: 11px; color: var(--text3); }
+
+/* ── TABS ── */
+.tabs {
+  display: flex; background: var(--bg2); border-radius: 12px;
+  padding: 4px; margin-bottom: 16px; flex-shrink: 0;
+}
+.tab {
+  flex: 1; padding: 8px; border-radius: 9px; font-size: 13px;
+  font-weight: 500; text-align: center; cursor: pointer;
+  color: var(--text2); transition: all 0.2s; user-select: none;
+}
+.tab.active { background: var(--bg3); color: var(--text); }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: rgba(10,10,15,0.92); backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--border);
+  display: flex; padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+  flex-shrink: 0; z-index: 100;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 6px 0; cursor: pointer; color: var(--text3);
+  transition: color 0.2s; user-select: none;
+}
+.nav-item.active { color: var(--accent2); }
+.nav-icon { font-size: 22px; line-height: 1; }
+.nav-label { font-size: 9px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+
+/* ── FAB ── */
+.fab {
+  position: fixed; bottom: calc(70px + env(safe-area-inset-bottom)); right: 20px;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--accent); border: none; color: #fff;
+  font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(124,92,252,0.4);
+  transition: all 0.2s; z-index: 99;
+}
+.fab:active { transform: scale(0.92); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  display: none; align-items: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+.modal-overlay.open { display: flex; }
+.modal-sheet {
+  width: 100%; background: var(--bg2);
+  border-radius: 20px 20px 0 0;
+  border-top: 0.5px solid var(--border2);
+  padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
+  animation: slideUp 0.3s ease;
+  max-height: 92vh; overflow-y: auto;
+}
+.modal-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--border2); margin: 0 auto 20px; }
+.modal-title { font-family: 'Unbounded', sans-serif; font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+
+/* ── FORM ── */
+.form-group { margin-bottom: 14px; }
+.form-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; display: block; }
+.form-input {
+  width: 100%; background: var(--bg3); border: 0.5px solid var(--border2);
+  border-radius: var(--r2); padding: 12px 14px; color: var(--text);
+  font-size: 15px; font-family: 'Inter', sans-serif; outline: none;
+  transition: border-color 0.2s; -webkit-appearance: none;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text3); }
+
+.cat-chips {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  max-height: 200px; overflow-y: auto; padding-bottom: 4px;
+}
+.chip {
+  padding: 7px 12px; border-radius: 20px;
+  background: var(--bg3); border: 0.5px solid var(--border);
+  font-size: 13px; color: var(--text2); cursor: pointer;
+  transition: all 0.15s; white-space: nowrap; user-select: none;
+}
+.chip.selected { background: rgba(124,92,252,0.2); border-color: var(--accent); color: var(--accent2); }
+.chip:active { transform: scale(0.96); }
+
+/* ── BUTTONS ── */
+.btn-primary {
+  width: 100%; padding: 14px; border-radius: var(--r);
+  background: var(--accent); border: none; color: #fff;
+  font-size: 15px; font-weight: 600; cursor: pointer;
+  font-family: 'Inter', sans-serif; transition: all 0.15s;
+  margin-top: 8px;
+}
+.btn-primary:active { transform: scale(0.98); background: var(--accent2); }
+.btn-secondary {
+  width: 100%; padding: 13px; border-radius: var(--r);
+  background: transparent; border: 0.5px solid var(--border2); color: var(--text2);
+  font-size: 14px; cursor: pointer; font-family: 'Inter', sans-serif;
+  transition: all 0.15s; margin-top: 8px;
+}
+.btn-secondary:active { background: var(--bg3); }
+.btn-danger {
+  background: rgba(255,95,109,0.15); border-color: rgba(255,95,109,0.3); color: var(--red);
+}
+
+/* ── TYPE TOGGLE ── */
+.type-toggle { display: flex; gap: 8px; margin-bottom: 16px; }
+.type-btn {
+  flex: 1; padding: 10px; border-radius: var(--r2);
+  border: 0.5px solid var(--border); background: var(--bg3);
+  color: var(--text2); font-size: 13px; font-weight: 500;
+  cursor: pointer; text-align: center; transition: all 0.15s; user-select: none;
+}
+.type-btn.active.expense { background: rgba(255,95,109,0.15); border-color: rgba(255,95,109,0.4); color: var(--red); }
+.type-btn.active.income  { background: rgba(45,212,160,0.15); border-color: rgba(45,212,160,0.4); color: var(--green); }
+
+/* ── AMOUNT INPUT ── */
+.amount-row { display: flex; align-items: center; gap: 8px; }
+.amount-currency { font-family: 'Unbounded', sans-serif; font-size: 20px; color: var(--text3); flex-shrink: 0; }
+.amount-input {
+  flex: 1; background: transparent; border: none; color: var(--text);
+  font-family: 'Unbounded', sans-serif; font-size: 28px; font-weight: 600;
+  outline: none; width: 100%; -webkit-appearance: none;
+}
+.amount-input::placeholder { color: var(--border2); }
+.amount-line { height: 1px; background: var(--border2); margin-bottom: 20px; }
+
+/* ── TRANSACTIONS LIST ── */
+.tx-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 0.5px solid var(--border);
+}
+.tx-item:last-child { border-bottom: none; }
+.tx-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.tx-icon.expense { background: rgba(255,95,109,0.12); }
+.tx-icon.income  { background: rgba(45,212,160,0.12); }
+.tx-info { flex: 1; min-width: 0; }
+.tx-cat { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tx-date { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.tx-amount { font-size: 15px; font-weight: 600; flex-shrink: 0; }
+.tx-amount.expense { color: var(--red); }
+.tx-amount.income  { color: var(--green); }
+
+/* ── YEAR CHART ── */
+.year-chart { display: flex; align-items: flex-end; gap: 4px; height: 80px; padding: 0 2px; }
+.year-bar-group { flex: 1; display: flex; gap: 2px; align-items: flex-end; }
+.year-bar { flex: 1; border-radius: 3px 3px 0 0; min-height: 3px; transition: height 0.6s ease; }
+.year-bar.plan { background: rgba(124,92,252,0.3); }
+.year-bar.fact { background: var(--accent); }
+.year-labels { display: flex; gap: 4px; padding: 6px 2px 0; }
+.year-label { flex: 1; font-size: 8px; color: var(--text3); text-align: center; }
+
+/* ── SETTINGS ── */
+.setting-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 0; border-bottom: 0.5px solid var(--border);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-icon { font-size: 20px; width: 36px; text-align: center; }
+.setting-text { flex: 1; }
+.setting-title { font-size: 14px; }
+.setting-sub { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.setting-arrow { color: var(--text3); font-size: 16px; }
+
+/* ── KEYFRAMES ── */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ LOCK SCREEN -->
+<div id="lockScreen">
+  <div class="lock-logo">Мой Бюджет</div>
+  <div class="lock-dots" id="lockDots">
+    <div class="lock-dot" id="d0"></div>
+    <div class="lock-dot" id="d1"></div>
+    <div class="lock-dot" id="d2"></div>
+    <div class="lock-dot" id="d3"></div>
+  </div>
+  <div class="pin-hint" id="pinHint">Введи PIN-код</div>
+  <div class="numpad">
+    <button class="num-btn" onclick="numPress('1')">1</button>
+    <button class="num-btn" onclick="numPress('2')">2</button>
+    <button class="num-btn" onclick="numPress('3')">3</button>
+    <button class="num-btn" onclick="numPress('4')">4</button>
+    <button class="num-btn" onclick="numPress('5')">5</button>
+    <button class="num-btn" onclick="numPress('6')">6</button>
+    <button class="num-btn" onclick="numPress('7')">7</button>
+    <button class="num-btn" onclick="numPress('8')">8</button>
+    <button class="num-btn" onclick="numPress('9')">9</button>
+    <button class="num-btn empty"></button>
+    <button class="num-btn" onclick="numPress('0')">0</button>
+    <button class="num-btn del" onclick="numDel()">⌫</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ APP -->
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div>
+      <div class="header-title" id="pageTitle">Обзор</div>
+      <div class="header-sub" id="pageSubtitle">Май 2026</div>
+    </div>
+    <button class="icon-btn" onclick="openAddModal()">＋</button>
+  </div>
+
+  <!-- SCROLL BODY -->
+  <div class="scroll-body" id="scrollBody">
+    <!-- injected by JS -->
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="mainFab" onclick="openAddModal()">＋</button>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <div class="nav-item active" onclick="switchPage('home')" id="nav-home">
+      <div class="nav-icon">◎</div>
+      <div class="nav-label">Обзор</div>
+    </div>
+    <div class="nav-item" onclick="switchPage('txs')" id="nav-txs">
+      <div class="nav-icon">≡</div>
+      <div class="nav-label">История</div>
+    </div>
+    <div class="nav-item" onclick="switchPage('year')" id="nav-year">
+      <div class="nav-icon">↗</div>
+      <div class="nav-label">Год</div>
+    </div>
+    <div class="nav-item" onclick="switchPage('cats')" id="nav-cats">
+      <div class="nav-icon">◈</div>
+      <div class="nav-label">Категории</div>
+    </div>
+    <div class="nav-item" onclick="switchPage('settings')" id="nav-settings">
+      <div class="nav-icon">⊙</div>
+      <div class="nav-label">Настройки</div>
+    </div>
+  </nav>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ ADD MODAL -->
+<div class="modal-overlay" id="addModal" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Новая запись</div>
+
+    <div class="type-toggle">
+      <div class="type-btn active expense" id="ttExpense" onclick="setType('expense')">💳 Расход</div>
+      <div class="type-btn income" id="ttIncome" onclick="setType('income')">💰 Доход</div>
+    </div>
+
+    <div class="amount-row">
+      <div class="amount-currency">₽</div>
+      <input type="number" class="amount-input" id="amountInput" placeholder="0" inputmode="decimal">
+    </div>
+    <div class="amount-line"></div>
+
+    <div class="form-group">
+      <label class="form-label">Категория</label>
+      <div class="cat-chips" id="catChips"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Комментарий</label>
+      <input type="text" class="form-input" id="commentInput" placeholder="Необязательно">
+    </div>
+
+    <button class="btn-primary" onclick="saveTransaction()">Сохранить</button>
+    <button class="btn-secondary" onclick="closeModalBtn()">Отмена</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ CAT MGMT MODAL -->
+<div class="modal-overlay" id="catModal" onclick="closeCatModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="catModalTitle">Категории</div>
+
+    <div class="type-toggle">
+      <div class="type-btn active expense" id="cmtExpense" onclick="setCatMgmtType('expense')">Расходы</div>
+      <div class="type-btn income" id="cmtIncome" onclick="setCatMgmtType('income')">Доходы</div>
+    </div>
+
+    <div id="catMgmtList"></div>
+
+    <div class="form-group" style="margin-top:16px">
+      <label class="form-label">Добавить новую</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="form-input" id="newCatInput" placeholder="Название категории" style="flex:1">
+        <button onclick="addCatFromModal()" style="padding:0 18px;border-radius:var(--r2);background:var(--accent);border:none;color:#fff;font-size:18px;cursor:pointer;flex-shrink:0">＋</button>
+      </div>
+    </div>
+    <button class="btn-secondary" onclick="closeCatModalBtn()">Закрыть</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ PIN CHANGE MODAL -->
+<div class="modal-overlay" id="pinModal" onclick="closePinModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Изменить PIN</div>
+    <div class="form-group">
+      <label class="form-label">Текущий PIN</label>
+      <input type="password" class="form-input" id="oldPinInput" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Новый PIN (4 цифры)</label>
+      <input type="password" class="form-input" id="newPinInput" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Повтори новый PIN</label>
+      <input type="password" class="form-input" id="newPin2Input" inputmode="numeric" maxlength="4" placeholder="••••">
+    </div>
+    <button class="btn-primary" onclick="saveNewPin()">Сохранить</button>
+    <button class="btn-secondary" onclick="closePinModalBtn()">Отмена</button>
+  </div>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// TELEGRAM WEB APP INIT
+// ═════════════════════════════════════════════════════════════════════════════
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PIN LOCK  (default: 1234 — change on first launch)
+// ═════════════════════════════════════════════════════════════════════════════
+const DEFAULT_PIN = '1234';
+let pinBuffer = '';
+let pinAttempts = 0;
+
+function getPin() { return localStorage.getItem('budget_pin') || DEFAULT_PIN; }
+
+function numPress(d) {
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += d;
+  updateDots();
+  if (pinBuffer.length === 4) setTimeout(checkPin, 120);
+}
+
+function numDel() {
+  pinBuffer = pinBuffer.slice(0, -1);
+  updateDots();
+  document.getElementById('pinHint').textContent = 'Введи PIN-код';
+}
+
+function updateDots(cls='') {
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById('d'+i);
+    el.className = 'lock-dot' + (i < pinBuffer.length ? ' filled' : '') + (cls ? ' ' + cls : '');
+  }
+}
+
+function checkPin() {
+  if (pinBuffer === getPin()) {
+    pinAttempts = 0;
+    document.getElementById('pinHint').textContent = '✓';
+    setTimeout(() => {
+      document.getElementById('lockScreen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      renderPage();
+    }, 200);
+  } else {
+    pinAttempts++;
+    updateDots('error');
+    const wait = pinAttempts >= 3 ? ` Подожди ${pinAttempts * 5} сек` : '';
+    document.getElementById('pinHint').textContent = 'Неверный PIN' + wait;
+    setTimeout(() => {
+      pinBuffer = '';
+      updateDots();
+    }, 700);
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DATA LAYER  (localStorage — в реальном деплое замени на API)
+// ═════════════════════════════════════════════════════════════════════════════
+const MONTHS = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+const MONTHS_FULL = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function now() { return new Date(); }
+function ym() { const d=now(); return {y:d.getFullYear(), m:d.getMonth()+1}; }
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+function getData() { return JSON.parse(localStorage.getItem('budget_data') || 'null') || { txs:[], plans:{}, cats_expense:[...DEFAULT_EXP], cats_income:[...DEFAULT_INC] }; }
+function saveData(d) { localStorage.setItem('budget_data', JSON.stringify(d)); }
+
+const DEFAULT_EXP = [
+  'Жилье','Питание','Кофе','Автомобиль/Проезд','Хозтовары','Еда кошки',
+  'Мобильный телефон','Интернет','Сайты/Телеграм','Стрижка/Ногти',
+  'Косметика','Развлечения','Товары (дом, книги)','Одежда/Обувь',
+  'Техника/Ремонт','Хобби','Ремонт','Ювелирка','Вложения в проекты',
+  'Врач/Анализы/Стоматология','Психолог','Аптека','Йога','Водоросли/БАДы',
+  'Массаж','Вождение/Машина','Обучение','Долги/Рассрочка',
+  'Отложить (подушка)','Отложить на квартиру','Отложить на машину',
+  'Отложить на здоровье','Инвестиции','Отпуск','Подарки (себе)','КЮК',
+];
+const DEFAULT_INC = [
+  'Основной заработок (клиника)','Частная практика','Вторая работа',
+  'Отпускные','Командировочные','Заняла у себя','Возврат/Вычет',
+  'Продажа/Перепродажа','Проценты по вкладам','Мультибонусы','Подарок',
+  'Дала в долг (без %)','КЮК',
+];
+
+const CAT_COLORS = [
+  '#7c5cfc','#2dd4a0','#ff5f6d','#fbbf24','#38bdf8','#f472b6',
+  '#a78bfa','#34d399','#fb923c','#60a5fa','#e879f9','#4ade80',
+];
+function catColor(name) {
+  let h = 0;
+  for (let i=0; i<name.length; i++) h = (h*31 + name.charCodeAt(i)) & 0xffff;
+  return CAT_COLORS[h % CAT_COLORS.length];
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('ru-RU').format(Math.round(n)) + ' ₽';
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PAGE ROUTING
+// ═════════════════════════════════════════════════════════════════════════════
+let currentPage = 'home';
+
+function switchPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  document.getElementById('mainFab').style.display = ['home','txs'].includes(page) ? 'flex' : 'none';
+  renderPage();
+}
+
+function renderPage() {
+  const {y,m} = ym();
+  const titles = {home:'Обзор',txs:'История',year:'За год',cats:'Категории',settings:'Настройки'};
+  document.getElementById('pageTitle').textContent = titles[currentPage] || '';
+  document.getElementById('pageSubtitle').textContent = currentPage==='year' ? String(y) : `${MONTHS_FULL[m-1]} ${y}`;
+
+  const body = document.getElementById('scrollBody');
+  body.scrollTop = 0;
+  if (currentPage === 'home')     body.innerHTML = renderHome();
+  else if (currentPage === 'txs') body.innerHTML = renderTxs();
+  else if (currentPage === 'year')body.innerHTML = renderYear();
+  else if (currentPage === 'cats')body.innerHTML = renderCatsPage();
+  else if (currentPage === 'settings') body.innerHTML = renderSettings();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// HOME
+// ═════════════════════════════════════════════════════════════════════════════
+function renderHome() {
+  const data = getData();
+  const {y,m} = ym();
+  const txs = data.txs.filter(t => t.year===y && t.month===m);
+  const totalInc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const totalExp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+  const bal = totalInc - totalExp;
+
+  const planKey = `${y}-${m}`;
+  const plans = data.plans[planKey] || {};
+  const planExp = Object.values(plans).filter((_,k)=>true).reduce((s,v)=>s+v,0);
+
+  // group expenses by cat
+  const byCat = {};
+  txs.filter(t=>t.type==='expense').forEach(t => {
+    byCat[t.category] = (byCat[t.category]||0) + t.amount;
+  });
+  const catRows = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  let catHTML = catRows.map(([name,fact]) => {
+    const plan = plans[name] || 0;
+    const pct = plan ? Math.round(fact/plan*100) : 0;
+    const cls = pct>100?'red':pct>75?'amber':'green';
+    const barW = plan ? Math.min(fact/plan*100,100) : 0;
+    return `<div class="cat-item">
+      <div class="cat-dot" style="background:${catColor(name)}"></div>
+      <div class="cat-name">${name}</div>
+      <div class="cat-vals">
+        <div class="cat-fact" style="color:${catColor(name)}">${fmt(fact)}</div>
+        ${plan ? `<div class="cat-plan">${fmt(plan)}</div>` : ''}
+      </div>
+    </div>
+    ${plan ? `<div class="prog-bar"><div class="prog-fill ${cls}" style="width:${barW}%"></div></div>` : ''}`;
+  }).join('');
+
+  const balClass = bal >= 0 ? 'pos' : 'neg';
+  const balSign  = bal >= 0 ? '+' : '';
+
+  return `
+  <div class="balance-card">
+    <div class="balance-label">Остаток месяца</div>
+    <div class="balance-amount ${balClass}">${balSign}${fmt(bal)}</div>
+    <div class="balance-row">
+      <div class="balance-mini">
+        <div class="balance-mini-label">Доходы</div>
+        <div class="balance-mini-val" style="color:var(--green)">${fmt(totalInc)}</div>
+      </div>
+      <div class="balance-mini">
+        <div class="balance-mini-label">Расходы</div>
+        <div class="balance-mini-val" style="color:var(--red)">${fmt(totalExp)}</div>
+      </div>
+    </div>
+  </div>
+
+  ${catRows.length ? `
+  <div class="card">
+    <div class="section-title">Расходы по категориям</div>
+    ${catHTML}
+  </div>` : `<div class="card"><div style="text-align:center;color:var(--text3);padding:24px 0">Нет расходов в этом месяце.<br>Нажми ＋ чтобы добавить.</div></div>`}
+  `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TRANSACTIONS
+// ═════════════════════════════════════════════════════════════════════════════
+function renderTxs() {
+  const data = getData();
+  const {y,m} = ym();
+  const txs = [...data.txs].filter(t=>t.year===y&&t.month===m).reverse();
+  if (!txs.length) return `<div class="card"><div style="text-align:center;color:var(--text3);padding:24px 0">История пуста</div></div>`;
+
+  const rows = txs.map(t => `
+    <div class="tx-item">
+      <div class="tx-icon ${t.type}">${t.type==='expense'?'💳':'💰'}</div>
+      <div class="tx-info">
+        <div class="tx-cat">${t.category}</div>
+        <div class="tx-date">${fmtDate(t.date)}${t.comment?' · '+t.comment:''}</div>
+      </div>
+      <div class="tx-amount ${t.type}">${t.type==='expense'?'−':'+'}${fmt(t.amount)}</div>
+    </div>
+  `).join('');
+  return `<div class="card">${rows}</div>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// YEAR
+// ═════════════════════════════════════════════════════════════════════════════
+function renderYear() {
+  const data = getData();
+  const y = now().getFullYear();
+  let cum = 0;
+  const months = [];
+  for (let m=1; m<=12; m++) {
+    const txs = data.txs.filter(t=>t.year===y&&t.month===m);
+    const inc = txs.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+    const exp = txs.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+    const key = `${y}-${m}`;
+    const planExp = Object.values(data.plans[key]||{}).reduce((s,v)=>s+v,0);
+    months.push({m,inc,exp,planExp});
+    cum += inc-exp;
+  }
+  const maxVal = Math.max(...months.map(x=>Math.max(x.planExp,x.exp,1)));
+
+  const bars = months.map(({m,exp,planExp})=>{
+    const pctPlan = planExp ? Math.round(planExp/maxVal*100) : 0;
+    const pctFact = exp    ? Math.round(exp/maxVal*100) : 0;
+    return `<div class="year-bar-group">
+      ${pctPlan ? `<div class="year-bar plan" style="height:${pctPlan}%"></div>` : ''}
+      ${pctFact ? `<div class="year-bar fact" style="height:${pctFact}%"></div>` : `<div class="year-bar" style="height:3px;background:var(--border)"></div>`}
+    </div>`;
+  }).join('');
+
+  const labels = MONTHS.map(mn=>`<div class="year-label">${mn}</div>`).join('');
+
+  // накопления
+  const savCats = data.cats_expense.filter(c=>c.toLowerCase().includes('отложить')||c.toLowerCase().includes('инвест'));
+  const savRows = savCats.map(cat=>{
+    const s = data.txs.filter(t=>t.year===y&&t.type==='expense'&&t.category===cat).reduce((a,t)=>a+t.amount,0);
+    if (!s) return '';
+    return `<div class="cat-item"><div class="cat-dot" style="background:${catColor(cat)}"></div><div class="cat-name">${cat}</div><div class="cat-fact" style="color:var(--green)">${fmt(s)}</div></div>`;
+  }).filter(Boolean).join('');
+
+  const monthRows = months.filter(x=>x.inc||x.exp).map(({m,inc,exp})=>{
+    const bal = inc-exp;
+    return `<div class="cat-item">
+      <div class="cat-name">${MONTHS[m-1]}</div>
+      <div class="cat-vals" style="text-align:right">
+        <div class="cat-fact" style="color:${bal>=0?'var(--green)':'var(--red)'}">
+          ${bal>=0?'+':''}${fmt(bal)}
+        </div>
+        <div class="cat-plan">${fmt(inc)} / ${fmt(exp)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="balance-card">
+    <div class="balance-label">Накоплено за ${y}</div>
+    <div class="balance-amount ${cum>=0?'pos':'neg'}">${cum>=0?'+':''}${fmt(cum)}</div>
+  </div>
+  <div class="card">
+    <div class="section-title">Расходы: план vs факт</div>
+    <div class="year-chart">${bars}</div>
+    <div class="year-labels">${labels}</div>
+    <div style="display:flex;gap:16px;margin-top:10px">
+      <span style="font-size:11px;color:var(--text3)"><span style="display:inline-block;width:10px;height:10px;background:rgba(124,92,252,0.3);border-radius:2px;margin-right:4px;vertical-align:middle"></span>план</span>
+      <span style="font-size:11px;color:var(--text3)"><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;margin-right:4px;vertical-align:middle"></span>факт</span>
+    </div>
+  </div>
+  ${monthRows ? `<div class="card"><div class="section-title">По месяцам</div>${monthRows}</div>` : ''}
+  ${savRows ? `<div class="card"><div class="section-title">Накопления</div>${savRows}</div>` : ''}
+  `;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CATEGORIES PAGE
+// ═════════════════════════════════════════════════════════════════════════════
+function renderCatsPage() {
+  return `
+  <div class="card">
+    <div class="section-title">Управление категориями</div>
+    <div class="setting-row" onclick="openCatModal('expense')">
+      <div class="setting-icon">💳</div>
+      <div class="setting-text">
+        <div class="setting-title">Категории расходов</div>
+        <div class="setting-sub">${getData().cats_expense.length} категорий</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row" onclick="openCatModal('income')">
+      <div class="setting-icon">💰</div>
+      <div class="setting-text">
+        <div class="setting-title">Категории доходов</div>
+        <div class="setting-sub">${getData().cats_income.length} категорий</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+  </div>
+  <div style="padding:8px 16px;font-size:12px;color:var(--text3)">
+    Все изменения сразу применяются к форме добавления записи.
+    История транзакций при переименовании обновляется автоматически.
+  </div>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═════════════════════════════════════════════════════════════════════════════
+function renderSettings() {
+  return `
+  <div class="card">
+    <div class="setting-row" onclick="openPinModal()">
+      <div class="setting-icon">🔒</div>
+      <div class="setting-text">
+        <div class="setting-title">Изменить PIN-код</div>
+        <div class="setting-sub">Защита входа (4 цифры)</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row" onclick="openCatModal('expense')">
+      <div class="setting-icon">⚙️</div>
+      <div class="setting-text">
+        <div class="setting-title">Категории расходов</div>
+        <div class="setting-sub">Добавить, удалить, переименовать</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row" onclick="openCatModal('income')">
+      <div class="setting-icon">⚙️</div>
+      <div class="setting-text">
+        <div class="setting-title">Категории доходов</div>
+        <div class="setting-sub">Добавить, удалить, переименовать</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:0">
+    <div class="setting-row" onclick="exportData()">
+      <div class="setting-icon">📤</div>
+      <div class="setting-text">
+        <div class="setting-title">Экспорт данных</div>
+        <div class="setting-sub">Скачать JSON-файл</div>
+      </div>
+      <div class="setting-arrow">›</div>
+    </div>
+    <div class="setting-row" onclick="if(confirm('Сбросить все данные? Это нельзя отменить.'))clearData()">
+      <div class="setting-icon">🗑</div>
+      <div class="setting-text">
+        <div class="setting-title" style="color:var(--red)">Сбросить данные</div>
+        <div class="setting-sub">Удалить все транзакции</div>
+      </div>
+      <div class="setting-arrow" style="color:var(--red)">›</div>
+    </div>
+  </div>
+  <div style="padding:16px;text-align:center;font-size:11px;color:var(--text3)">
+    Мой Бюджет v2.0 · Данные хранятся локально
+  </div>`;
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ADD TRANSACTION MODAL
+// ═════════════════════════════════════════════════════════════════════════════
+let addType = 'expense';
+let selectedCat = null;
+
+function openAddModal() {
+  addType = 'expense'; selectedCat = null;
+  document.getElementById('amountInput').value = '';
+  document.getElementById('commentInput').value = '';
+  setType('expense');
+  document.getElementById('addModal').classList.add('open');
+}
+
+function closeModal(e) { if(e.target.id==='addModal') closeModalBtn(); }
+function closeModalBtn() { document.getElementById('addModal').classList.remove('open'); }
+
+function setType(type) {
+  addType = type; selectedCat = null;
+  document.getElementById('ttExpense').className = 'type-btn' + (type==='expense'?' active expense':'');
+  document.getElementById('ttIncome').className  = 'type-btn' + (type==='income' ?' active income':'');
+  renderChips();
+}
+
+function renderChips() {
+  const data = getData();
+  const cats = addType==='expense' ? data.cats_expense : data.cats_income;
+  document.getElementById('catChips').innerHTML = cats.map(c=>`
+    <div class="chip ${selectedCat===c?'selected':''}" onclick="selectChip('${c.replace(/'/g,"\\'")}')">
+      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${catColor(c)};margin-right:5px;vertical-align:middle"></span>${c}
+    </div>`).join('');
+}
+
+function selectChip(name) {
+  selectedCat = name;
+  renderChips();
+}
+
+function saveTransaction() {
+  const amount = parseFloat(document.getElementById('amountInput').value);
+  if (!amount || amount <= 0) { alert('Введи сумму'); return; }
+  if (!selectedCat) { alert('Выбери категорию'); return; }
+  const comment = document.getElementById('commentInput').value.trim();
+  const d = new Date();
+  const {y,m} = ym();
+  const data = getData();
+  data.txs.push({
+    id: Date.now(),
+    type: addType,
+    category: selectedCat,
+    amount,
+    comment,
+    date: d.toISOString().split('T')[0],
+    year: y,
+    month: m,
+  });
+  saveData(data);
+  closeModalBtn();
+  renderPage();
+  if (tg) tg.HapticFeedback?.notificationOccurred('success');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CATEGORY MANAGEMENT MODAL
+// ═════════════════════════════════════════════════════════════════════════════
+let catMgmtType = 'expense';
+
+function openCatModal(type='expense') {
+  catMgmtType = type;
+  document.getElementById('newCatInput').value = '';
+  setCatMgmtType(type);
+  document.getElementById('catModal').classList.add('open');
+}
+
+function closeCatModal(e) { if(e.target.id==='catModal') closeCatModalBtn(); }
+function closeCatModalBtn() {
+  document.getElementById('catModal').classList.remove('open');
+  renderPage();
+}
+
+function setCatMgmtType(type) {
+  catMgmtType = type;
+  document.getElementById('cmtExpense').className = 'type-btn' + (type==='expense'?' active expense':'');
+  document.getElementById('cmtIncome').className  = 'type-btn' + (type==='income' ?' active income':'');
+  renderCatMgmtList();
+}
+
+function renderCatMgmtList() {
+  const data = getData();
+  const cats = catMgmtType==='expense' ? data.cats_expense : data.cats_income;
+  document.getElementById('catMgmtList').innerHTML = cats.map((cat,i) => `
+    <div class="cat-item" style="align-items:center">
+      <div class="cat-dot" style="background:${catColor(cat)}"></div>
+      <div class="cat-name" id="catRow_${i}">${cat}</div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="renameCat(${i})" style="padding:5px 10px;border-radius:8px;background:var(--bg2);border:0.5px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer">✏️</button>
+        <button onclick="deleteCat(${i})" style="padding:5px 10px;border-radius:8px;background:rgba(255,95,109,0.1);border:0.5px solid rgba(255,95,109,0.3);color:var(--red);font-size:12px;cursor:pointer">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function addCatFromModal() {
+  const name = document.getElementById('newCatInput').value.trim();
+  if (!name) return;
+  const data = getData();
+  const arr = catMgmtType==='expense' ? data.cats_expense : data.cats_income;
+  if (arr.includes(name)) { alert('Категория уже существует'); return; }
+  arr.push(name);
+  saveData(data);
+  document.getElementById('newCatInput').value = '';
+  renderCatMgmtList();
+}
+
+function deleteCat(idx) {
+  const data = getData();
+  const arr = catMgmtType==='expense' ? data.cats_expense : data.cats_income;
+  const name = arr[idx];
+  if (!confirm(`Удалить «${name}»?\nТранзакции сохранятся.`)) return;
+  arr.splice(idx, 1);
+  if (catMgmtType==='expense') data.cats_expense=arr; else data.cats_income=arr;
+  saveData(data);
+  renderCatMgmtList();
+}
+
+function renameCat(idx) {
+  const data = getData();
+  const arr = catMgmtType==='expense' ? data.cats_expense : data.cats_income;
+  const old = arr[idx];
+  const newName = prompt(`Переименовать «${old}»:`, old);
+  if (!newName || newName===old) return;
+  if (arr.includes(newName)) { alert('Такое название уже есть'); return; }
+  arr[idx] = newName;
+  // update transactions too
+  data.txs.forEach(t => { if(t.category===old && t.type===catMgmtType) t.category=newName; });
+  saveData(data);
+  renderCatMgmtList();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PIN CHANGE
+// ═════════════════════════════════════════════════════════════════════════════
+function openPinModal() { document.getElementById('pinModal').classList.add('open'); }
+function closePinModal(e) { if(e.target.id==='pinModal') closePinModalBtn(); }
+function closePinModalBtn() { document.getElementById('pinModal').classList.remove('open'); }
+
+function saveNewPin() {
+  const old  = document.getElementById('oldPinInput').value;
+  const n1   = document.getElementById('newPinInput').value;
+  const n2   = document.getElementById('newPin2Input').value;
+  if (old !== getPin()) { alert('Неверный текущий PIN'); return; }
+  if (!/^\d{4}$/.test(n1)) { alert('Новый PIN — 4 цифры'); return; }
+  if (n1 !== n2) { alert('PIN-коды не совпадают'); return; }
+  localStorage.setItem('budget_pin', n1);
+  alert('PIN изменён!');
+  closePinModalBtn();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UTILS
+// ═════════════════════════════════════════════════════════════════════════════
+function exportData() {
+  const json = localStorage.getItem('budget_data') || '{}';
+  const blob = new Blob([json], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `budget_${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+}
+
+function clearData() {
+  localStorage.removeItem('budget_data');
+  renderPage();
+}
+</script>
+</body>
+</html>
